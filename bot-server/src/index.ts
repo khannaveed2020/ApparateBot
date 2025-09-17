@@ -4,8 +4,8 @@ import { Request, Response } from 'restify';
 import axios from 'axios';
 
 // DIAGNOSTIC: Comprehensive Bot Framework behavior analysis
-console.log('🔍 STARTING COMPREHENSIVE DIAGNOSTIC MODE');
-console.log('📊 This version will track all Bot Framework operations systematically');
+console.log('STARTING COMPREHENSIVE DIAGNOSTIC MODE');
+console.log('This version will track all Bot Framework operations systematically');
 
 // Create server
 const server = restify.createServer();
@@ -45,8 +45,37 @@ let operationCounter = 0;
 const logOperation = (operation: string, data: any) => {
     operationCounter++;
     const timestamp = new Date().toISOString();
-    console.log(`[${operationCounter}] [${timestamp}] ${operation}:`, JSON.stringify(data, null, 2));
-    globalStorage.stateHistory.push({ op: operation, data, timestamp, counter: operationCounter });
+    
+    // Safe JSON stringification to handle circular references
+    let logData;
+    try {
+        logData = JSON.stringify(data, null, 2);
+    } catch (circularError) {
+        // Handle circular references by creating a safe representation
+        logData = JSON.stringify(data, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+                // Replace circular references with a placeholder
+                if (key === 'stateHistory' || key === 'globalStorage') {
+                    return '[Circular Reference Removed]';
+                }
+            }
+            return value;
+        }, 2);
+    }
+    
+    console.log(`[${operationCounter}] [${timestamp}] ${operation}:`, logData);
+    
+    // Store safe data in history (avoid storing circular references)
+    const safeData = typeof data === 'object' && data !== null 
+        ? { ...data, stateHistory: undefined, globalStorage: undefined }
+        : data;
+        
+    globalStorage.stateHistory.push({ 
+        op: operation, 
+        data: safeData, 
+        timestamp, 
+        counter: operationCounter 
+    });
     
     // Keep only last 50 operations to prevent memory issues
     if (globalStorage.stateHistory.length > 50) {
@@ -134,7 +163,7 @@ class TABot {
                     currentState: currentDialogState
                 };
 
-                await context.sendActivity(`🔍 **DIAGNOSTIC REPORT**\n\`\`\`json\n${JSON.stringify(diagnosticReport, null, 2)}\n\`\`\``);
+                await context.sendActivity(`**DIAGNOSTIC REPORT**\n\`\`\`json\n${JSON.stringify(diagnosticReport, null, 2)}\n\`\`\``);
                 logOperation('diagnostic_report_sent', diagnosticReport);
                 return await next();
             }
@@ -152,13 +181,13 @@ class TABot {
                 await taDialogStateAccessor.set(context, currentDialogState);
                 await conversationState.saveChanges(context);
 
-                await context.sendActivity('🧹 All storage cleared for fresh diagnostic.');
+                await context.sendActivity('All storage cleared for fresh diagnostic.');
                 logOperation('storage_cleared', 'all_cleared');
                 return await next();
             }
 
             // Default TA response
-            await context.sendActivity('👋 TA Bot diagnostic mode active. Send "status" for diagnostic report, "clear" to reset storage.');
+            await context.sendActivity('TA Bot diagnostic mode active. Send "status" for diagnostic report, "clear" to reset storage.');
             logOperation('default_ta_response_sent', { messageText });
         }
 
@@ -219,7 +248,7 @@ class TABot {
                 logOperation('approval_card_failed', { error: cardError?.message });
             }
 
-            await context.sendActivity('✅ Handover acknowledged. Please review and approve/reject.');
+            await context.sendActivity('Handover acknowledged. Please review and approve/reject.');
 
         } else if (action === 'approve' || action === 'reject') {
             logOperation('approval_action_processing', { action, submissionData });
@@ -231,8 +260,8 @@ class TABot {
             dialogState.completedAt = new Date().toISOString();
 
             // Send completion message
-            const emoji = action === 'approve' ? '✅' : '❌';
-            await context.sendActivity(`${emoji} Handover ${action}d. Comments: ${comments}`);
+            const statusText = action === 'approve' ? 'APPROVED' : 'REJECTED';
+            await context.sendActivity(`${statusText}: Handover ${action}d. Comments: ${comments}`);
 
             // Send response back to UserBot via HTTP
             if (dialogState.originalConversationId || globalStorage.handover?.conversationId) {
@@ -265,7 +294,7 @@ class TABot {
             }
         } else {
             logOperation('unknown_submission_action', { action, submissionData });
-            await context.sendActivity(`❓ Unknown action: ${action}`);
+            await context.sendActivity(`Unknown action: ${action}`);
         }
 
         // Multiple state save attempts
@@ -293,7 +322,13 @@ class TABot {
 
         logOperation('handleAdaptiveCardSubmission_complete', {
             finalState: dialogState,
-            globalStorage: globalStorage
+            globalStorageSummary: {
+                handoverExists: !!globalStorage.handover,
+                taContextExists: !!globalStorage.taContext,
+                taConversationId: globalStorage.taConversationId,
+                stateHistoryCount: globalStorage.stateHistory.length,
+                userBotRefExists: !!globalStorage.userBotConversationRef
+            }
         });
     }
 
@@ -326,7 +361,7 @@ class TABot {
                     }]
                 });
 
-                await context.sendActivity('⚠️ **PENDING HANDOVER REQUEST** - Please review the case details above and click "Acknowledge" to proceed.');
+                await context.sendActivity('**PENDING HANDOVER REQUEST** - Please review the case details above and click "Acknowledge" to proceed.');
 
                 // Save state
                 await taDialogStateAccessor.set(context, dialogState);
@@ -359,7 +394,7 @@ class TABot {
             body: [
                 {
                     type: 'TextBlock',
-                    text: '🚨 URGENT HANDOVER REQUEST (DIAGNOSTIC)',
+                    text: 'URGENT HANDOVER REQUEST (DIAGNOSTIC)',
                     weight: 'Bolder',
                     size: 'Medium',
                     color: 'Attention'
@@ -377,7 +412,7 @@ class TABot {
             actions: [
                 {
                     type: 'Action.Submit',
-                    title: '✅ Acknowledge',
+                    title: 'Acknowledge',
                     data: { action: 'acknowledge' }
                 }
             ]
@@ -391,7 +426,7 @@ class TABot {
             body: [
                 {
                     type: 'TextBlock',
-                    text: '📋 HANDOVER DECISION (DIAGNOSTIC)',
+                    text: 'HANDOVER DECISION (DIAGNOSTIC)',
                     weight: 'Bolder',
                     size: 'Medium'
                 },
@@ -409,13 +444,13 @@ class TABot {
             actions: [
                 {
                     type: 'Action.Submit',
-                    title: '✅ Approve',
+                    title: 'Approve',
                     data: { action: 'approve' },
                     style: 'positive'
                 },
                 {
                     type: 'Action.Submit',
-                    title: '❌ Reject',
+                    title: 'Reject',
                     data: { action: 'reject' },
                     style: 'destructive'
                 }
@@ -500,7 +535,7 @@ const presentHandoverToTA = async (conversationId: string, handoverData: any, us
 
                 // Send text message
                 try {
-                    const textResult = await taContext.sendActivity('⚠️ **DIAGNOSTIC HANDOVER** - RCA in progress. Please interact.');
+                    const textResult = await taContext.sendActivity('**DIAGNOSTIC HANDOVER** - RCA in progress. Please interact.');
                     logOperation('text_message_sent', { result: textResult });
                 } catch (textError: any) {
                     logOperation('text_message_failed', { error: textError?.message });
@@ -523,11 +558,27 @@ const presentHandoverToTA = async (conversationId: string, handoverData: any, us
 
                 globalStorage.taContext = {
                     conversationId: taContext.activity?.conversation?.id,
-                    state: dialogState,
                     timestamp: Date.now()
                 };
 
-                logOperation('continue_conversation_callback_complete', globalStorage);
+                // Create safe summary for logging (avoid circular references)
+                const safeSummary = {
+                    handover: globalStorage.handover,
+                    taContext: globalStorage.taContext,
+                    taConversationId: taConvId,
+                    stateHistory: globalStorage.stateHistory ? globalStorage.stateHistory.map((entry: any) => ({
+                        op: entry.op,
+                        timestamp: entry.timestamp,
+                        counter: entry.counter,
+                        dataKeys: entry.data ? Object.keys(entry.data) : undefined
+                    })) : undefined,
+                    userBotConversationRef: globalStorage.userBotConversationRef ? {
+                        conversationId: globalStorage.userBotConversationRef.conversation?.id,
+                        channelId: globalStorage.userBotConversationRef.channelId
+                    } : undefined
+                };
+
+                logOperation('continue_conversation_callback_complete', safeSummary);
             });
 
             logOperation('handover_delivery_attempted', { success: true });
@@ -581,12 +632,14 @@ server.post('/api/handover', async (req: Request, res: Response) => {
         const conversationId = conversationRef.conversation.id;
         await presentHandoverToTA(conversationId, { case: caseData }, conversationRef);
         
-        // Return the expected response structure
+        // Return safe response structure without circular references
         res.send({ 
-            conversationRef: conversationRef,
+            conversationId: conversationId,
+            caseNumber: caseData?.caseNumber,
             decision: null,
             comment: null,
-            status: 'pending'
+            status: 'pending',
+            timestamp: new Date().toISOString()
         });
         logOperation('http_handover_response_sent', { success: true });
     } catch (error: any) {
@@ -596,20 +649,53 @@ server.post('/api/handover', async (req: Request, res: Response) => {
     }
 });
 
-// Bot endpoint
+// Bot endpoint with comprehensive error handling
 server.post('/api/messages', async (req, res) => {
-    await adapter.processActivity(req, res, async (context) => {
-        await taBot.onMessage(context, async () => {});
-    });
+    try {
+        await adapter.processActivity(req, res, async (context) => {
+            try {
+                await taBot.onMessage(context, async () => {});
+            } catch (botError: any) {
+                logOperation('bot_message_processing_error', {
+                    error: botError?.message,
+                    stack: botError?.stack?.split('\n').slice(0, 3),
+                    conversationId: context?.activity?.conversation?.id,
+                    activityType: context?.activity?.type
+                });
+                
+                // Send error response to user if possible
+                try {
+                    await context.sendActivity('An error occurred processing your message. Please try again.');
+                } catch (sendError: any) {
+                    logOperation('error_response_failed', { error: sendError?.message });
+                }
+            }
+        });
+    } catch (adapterError: any) {
+        logOperation('adapter_processing_error', {
+            error: adapterError?.message,
+            stack: adapterError?.stack?.split('\n').slice(0, 3),
+            requestBody: req?.body
+        });
+        
+        // Only send error response if headers haven't been sent
+        if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
+                error: 'Bot Framework processing failed',
+                timestamp: new Date().toISOString()
+            }));
+        }
+    }
 });
 
 // Start the server
 const port = process.env.port || process.env.PORT || 3978;
 server.listen(port, () => {
-    console.log(`\n🤖 TA Bot Server (COMPREHENSIVE DIAGNOSTIC MODE) listening on port ${port}`);
-    console.log(`📊 Full Bot Framework behavior analysis active`);
-    console.log(`🔍 Send "status" to TA bot for diagnostic report`);
-    console.log(`🧹 Send "clear" to TA bot to reset all storage`);
-    console.log(`⚡ Real-time operation logging enabled`);
+    console.log(`\nTA Bot Server (COMPREHENSIVE DIAGNOSTIC MODE) listening on port ${port}`);
+    console.log(`Full Bot Framework behavior analysis active`);
+    console.log(`Send "status" to TA bot for diagnostic report`);
+    console.log(`Send "clear" to TA bot to reset all storage`);
+    console.log(`Real-time operation logging enabled`);
     logOperation('server_started', { port, mode: 'DIAGNOSTIC' });
 });
