@@ -1,0 +1,10 @@
+Case No: 123
+Severity: A
+Sending Engineer: Naveed Khan
+Vertical: Hybrid
+SAP: Azure/VPN Gateway/Connectivity/Site-to-site VPN connectivity issues.
+Valid: true
+Reject Reason: 
+TA/MGR reviewer: Ravi Kumar
+Comments: This is approvd
+Timestamp: 2025-09-17T15:25:03.867Z

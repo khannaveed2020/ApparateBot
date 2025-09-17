@@ -12,7 +12,7 @@ export const getCaseSelectionCard = (cases: any[]) => ({
       id: 'caseNumber',
       style: 'expanded',
       choices: cases.map((c: any) => ({
-        title: `Case: ${c.caseNumber}, ${c.title}`,
+        title: `Case ${c.caseNumber} | Sev: ${c.severity} | 24/7: ${c.is247 ? 'Yes' : 'No'} | ${c.title}`,
         value: c.caseNumber
       }))
     }
@@ -27,14 +27,30 @@ export const getCaseSelectionCard = (cases: any[]) => ({
   version: '1.3'
 });
 
-export const getConfirmationCard = (caseNumber: string) => ({
+export const getConfirmationCard = (caseData: any) => ({
   type: 'AdaptiveCard',
   body: [
     {
       type: 'TextBlock',
-      text: `Are you sure you want to handover case ${caseNumber}?`,
+      text: `Handover Confirmation`,
       weight: 'Bolder',
       size: 'Medium'
+    },
+    {
+      type: 'FactSet',
+      facts: [
+        { title: 'Case Number:', value: caseData.caseNumber },
+        { title: 'Severity:', value: caseData.severity },
+        { title: '24/7 Support:', value: caseData.is247 ? 'Yes' : 'No' },
+        { title: 'Title:', value: caseData.title },
+        { title: 'Description:', value: caseData.description }
+      ]
+    },
+    {
+      type: 'TextBlock',
+      text: 'Do you want to proceed with handover?',
+      weight: 'Bolder',
+      size: 'Small'
     },
     {
       type: 'Input.ChoiceSet',

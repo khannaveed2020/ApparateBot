@@ -1,0 +1,11 @@
+Case No: 456
+Severity: A
+Sending Engineer: Harshdeep
+Vertical: Layer7
+SAP: Azure/Application Gateway/Facing 4xx errors/Other 4xx errors.
+Valid: true
+Reject Reason: 
+TA/MGR reviewer: Ratnavo Dutta
+Comments: Handover is approved
+
+Timestamp: 2025-09-17T16:18:25.895Z

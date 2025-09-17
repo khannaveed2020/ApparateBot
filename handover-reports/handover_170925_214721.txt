@@ -1,0 +1,10 @@
+Case No: 789
+Severity: B
+Sending Engineer: Rajiv
+Vertical: Hybrid
+SAP: Azure/ExpressRoute/ExpressRoute Private Peering/Latency on link
+Valid: false
+Reject Reason: Case severity is 'B' (needs 'A') and Case is not marked as 24/7 support
+TA/MGR reviewer: N/A
+Comments: Failed handover criteria validation at UserBot
+Timestamp: 2025-09-17T16:17:21.355Z

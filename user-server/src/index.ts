@@ -3,6 +3,7 @@ import { BotFrameworkAdapter, CardFactory, MemoryStorage, UserState, TurnContext
 import { cases } from './cases';
 import { getCaseSelectionCard, getConfirmationCard } from './adaptiveCards';
 import axios from 'axios';
+import { generateHandoverReport, saveHandoverReport, logHandoverOperation } from './handoverReport';
 
 const server = restify.createServer();
 
@@ -127,7 +128,7 @@ server.post('/api/messages', async (req, res) => {
                 caseFound: !!state.selectedCase
             });
             await context.sendActivity({
-                attachments: [CardFactory.adaptiveCard(getConfirmationCard(state.selectedCase.caseNumber))]
+                attachments: [CardFactory.adaptiveCard(getConfirmationCard(state.selectedCase))]
             });
             state.step = 'confirmation';
             await dialogStateAccessor.set(context, state);
@@ -205,6 +206,28 @@ server.post('/api/messages', async (req, res) => {
                         reason: reasonText,
                         failureReasons: failureReasons
                     });
+
+                    // Generate handover report for failed validation
+                    try {
+                        const report = generateHandoverReport(
+                            c, 
+                            false, // valid = false
+                            reasonText, // reject reason
+                            'Failed handover criteria validation at UserBot'
+                        );
+                        const reportPath = saveHandoverReport(report);
+                        logHandoverOperation('report_generated_validation_failure', {
+                            caseNumber: c.caseNumber,
+                            reportPath: reportPath,
+                            reason: reasonText
+                        });
+                    } catch (err) {
+                        console.error('Error generating handover report:', err);
+                        logUserOperation('report_generation_error', {
+                            caseNumber: c.caseNumber,
+                            error: err instanceof Error ? err.message : String(err)
+                        });
+                    }
                     
                     await context.sendActivity(`The case does not match handover criteria: ${reasonText}. Cases need either Severity A OR 24/7 support to be eligible for handover.`);
                     

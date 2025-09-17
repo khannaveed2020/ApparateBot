@@ -2,6 +2,7 @@ import * as restify from 'restify';
 import { BotFrameworkAdapter, TurnContext, MemoryStorage, ConversationState, ActivityTypes, ConversationReference } from 'botbuilder';
 import { Request, Response } from 'restify';
 import axios from 'axios';
+import { generateHandoverReport, saveHandoverReport, logHandoverOperation } from './handoverReport';
 
 // DIAGNOSTIC: Comprehensive Bot Framework behavior analysis
 console.log('STARTING COMPREHENSIVE DIAGNOSTIC MODE');
@@ -263,6 +264,40 @@ class TABot {
             const statusText = action === 'approve' ? 'APPROVED' : 'REJECTED';
             await context.sendActivity(`${statusText}: Handover ${action}d. Comments: ${comments}`);
 
+            // Generate handover report for TA decision
+            try {
+                const caseData = globalStorage.handover?.handoverData?.case;
+                if (caseData) {
+                    const isValid = action === 'approve';
+                    const rejectReason = action === 'reject' ? (comments || 'TA rejected handover') : '';
+                    
+                    const report = generateHandoverReport(
+                        caseData,
+                        isValid,
+                        rejectReason,
+                        comments
+                    );
+                    const reportPath = saveHandoverReport(report);
+                    
+                    logHandoverOperation('report_generated_ta_decision', {
+                        caseNumber: caseData.caseNumber,
+                        decision: action,
+                        reportPath: reportPath,
+                        taReviewer: caseData.taReviewer || 'Unknown TA'
+                    });
+                } else {
+                    logOperation('report_generation_failed_no_case_data', { 
+                        globalHandover: globalStorage.handover 
+                    });
+                }
+            } catch (err) {
+                console.error('Error generating handover report:', err);
+                logOperation('report_generation_error', {
+                    error: err instanceof Error ? err.message : String(err),
+                    action: action
+                });
+            }
+
             // Send response back to UserBot via HTTP
             if (dialogState.originalConversationId || globalStorage.handover?.conversationId) {
                 const targetConversationId = dialogState.originalConversationId || globalStorage.handover?.conversationId;
@@ -404,8 +439,13 @@ class TABot {
                     facts: [
                         { title: 'Case Number:', value: caseData.caseNumber },
                         { title: 'Severity:', value: caseData.severity },
+                        { title: '24/7 Support:', value: caseData.is247 ? 'Yes' : 'No' },
                         { title: 'Title:', value: caseData.title },
-                        { title: 'Description:', value: caseData.description }
+                        { title: 'Description:', value: caseData.description },
+                        { title: 'Vertical:', value: caseData.vertical || 'N/A' },
+                        { title: 'SAP:', value: caseData.sap || 'N/A' },
+                        { title: 'Sending Engineer:', value: caseData.sendingEngineer || 'N/A' },
+                        { title: 'TA Reviewer:', value: caseData.taReviewer || 'N/A' }
                     ]
                 }
             ],
@@ -533,13 +573,7 @@ const presentHandoverToTA = async (conversationId: string, handoverData: any, us
                     logOperation('adaptive_card_send_failed', { error: cardError?.message });
                 }
 
-                // Send text message
-                try {
-                    const textResult = await taContext.sendActivity('**DIAGNOSTIC HANDOVER** - RCA in progress. Please interact.');
-                    logOperation('text_message_sent', { result: textResult });
-                } catch (textError: any) {
-                    logOperation('text_message_failed', { error: textError?.message });
-                }
+                // Text message removed - TA should only see the adaptive card
 
                 // Save state
                 try {
