@@ -6,5 +6,5 @@ SAP: Azure/VPN Gateway/Connectivity/Site-to-site VPN connectivity issues.
 Valid: true
 Reject Reason: 
 TA/MGR reviewer: Ravi Kumar
-Comments: This is approvd
-Timestamp: 2025-09-17T15:25:03.867Z
+Comments: I approve this WARM HO. Please connect with the next engineer 
+Timestamp: 2025-09-17T17:11:08.305Z
